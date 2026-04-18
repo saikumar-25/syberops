@@ -85,7 +85,7 @@ export function AlertDetail({ alert, onClose }: AlertDetailProps) {
           {demoMode
             ? <span className="mode-tag demo">🔄 Demo Mode — Simulation Engine</span>
             : hasRealAI
-              ? <span className="mode-tag ai">🤖 AI Mode — Claude {process.env.NODE_ENV === 'production' ? '' : 'Agents'} Active</span>
+              ? <span className="mode-tag ai">🤖 AI Mode — Claude Agents Active</span>
               : <span className="mode-tag warn">⚠️ No Claude API key — add ANTHROPIC_API_KEY to backend</span>
           }
         </div>
