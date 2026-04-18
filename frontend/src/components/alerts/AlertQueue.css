@@ -1,0 +1,202 @@
+.alert-queue {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-lg);
+}
+
+.queue-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.queue-controls {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-select:hover {
+  border-color: var(--accent-cyan);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.refresh-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.refresh-toggle input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.refresh-toggle label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin: 0;
+}
+
+.queue-stats {
+  margin-bottom: var(--spacing-md);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.live-indicator {
+  color: var(--accent-green);
+  font-weight: 600;
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+.queue-table-wrapper {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-loading {
+  padding: var(--spacing-lg);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.queue-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.queue-table thead {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-bright);
+}
+
+.queue-table th {
+  padding: 12px;
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+  border: none;
+}
+
+.queue-table tbody {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.queue-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.queue-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.queue-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.queue-table td {
+  padding: 12px;
+  border: none;
+}
+
+/* Make table scrollable */
+.queue-table-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.queue-table thead {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.queue-table tbody {
+  display: block;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.queue-table tbody tr {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}

@@ -1,0 +1,116 @@
+.incident-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.empty-state {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.incident-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.incident-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  padding: var(--spacing-md);
+  transition: all 0.2s ease;
+}
+
+.incident-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-cyan);
+}
+
+.incident-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.incident-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.incident-id {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.incident-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.incident-status.status-investigating {
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--accent-purple);
+}
+
+.incident-status.status-contained {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+}
+
+.incident-status.status-resolved {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--accent-gray);
+}
+
+.incident-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.incident-meta {
+  display: flex;
+  gap: var(--spacing-lg);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.meta-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}

@@ -1,0 +1,46 @@
+.status-dot-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.status-connected {
+  background: var(--accent-green);
+}
+
+.status-dot.status-disconnected {
+  background: var(--accent-red);
+}
+
+.status-dot.status-connecting {
+  background: var(--accent-orange);
+}
+
+.status-dot.status-error {
+  background: var(--accent-red);
+}
+
+.status-dot.status-active {
+  background: var(--accent-green);
+}
+
+.status-dot.status-inactive {
+  background: var(--accent-gray);
+}
+
+.status-dot.animate {
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+.status-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
