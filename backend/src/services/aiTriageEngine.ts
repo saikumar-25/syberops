@@ -1,316 +1,310 @@
-import { Alert, AgentStep, ResponseAction, Verdict } from '../types';
+/**
+ * SyberOps — AI Triage Simulation Engine
+ *
+ * Produces the same agentic UX as the real Claude pipeline:
+ * tool calls stream in real-time, each with realistic output,
+ * followed by a findings summary per agent.
+ *
+ * Used when no ANTHROPIC_API_KEY is set (demo / offline mode).
+ */
+
+import { Alert, AgentStep, ToolCall, ResponseAction, Verdict } from '../types';
+import { executeTool } from './tools';
 
 export class AITriageEngine {
-  async triageAlert(alert: Alert, onProgress: (step: AgentStep, index: number) => void): Promise<Alert> {
-    const agents = [
-      {
-        name: 'AlertIntakeAgent',
-        label: 'Alert Intake',
-        delayMs: [400, 800],
-      },
-      {
-        name: 'EnrichmentAgent',
-        label: 'Enrichment',
-        delayMs: [800, 1500],
-      },
-      {
-        name: 'ThreatIntelAgent',
-        label: 'Threat Intelligence',
-        delayMs: [1000, 2000],
-      },
-      {
-        name: 'CorrelationAgent',
-        label: 'Correlation',
-        delayMs: [600, 1200],
-      },
-      {
-        name: 'InvestigationAgent',
-        label: 'Investigation',
-        delayMs: [1500, 3000],
-      },
-      {
-        name: 'VerdictAgent',
-        label: 'Verdict',
-        delayMs: [500, 1000],
-      },
-      {
-        name: 'ResponseAgent',
-        label: 'Response Planning',
-        delayMs: [400, 800],
-      },
-      {
-        name: 'ComplianceAgent',
-        label: 'Compliance',
-        delayMs: [300, 600],
-      },
-    ];
 
+  async triageAlert(
+    alert: Alert,
+    onProgress: (step: AgentStep, index: number) => void,
+  ): Promise<Alert> {
     alert.agentSteps = [];
 
-    for (let i = 0; i < agents.length; i++) {
-      const agent = agents[i];
-      const delay = this.randomDelay(agent.delayMs[0], agent.delayMs[1]);
+    const AGENTS = [
+      { name: 'AlertIntakeAgent',   label: 'Alert Intake',       baseMs: 600  },
+      { name: 'EnrichmentAgent',    label: 'Context Enrichment', baseMs: 1100 },
+      { name: 'ThreatIntelAgent',   label: 'Threat Intelligence',baseMs: 1400 },
+      { name: 'CorrelationAgent',   label: 'Alert Correlation',  baseMs: 900  },
+      { name: 'InvestigationAgent', label: 'Deep Investigation', baseMs: 1800 },
+      { name: 'VerdictAgent',       label: 'Verdict Rendering',  baseMs: 700  },
+      { name: 'ResponseAgent',      label: 'Response Planning',  baseMs: 600  },
+      { name: 'ComplianceAgent',    label: 'Compliance Check',   baseMs: 500  },
+    ];
 
-      const finding = this.generateFinding(alert, agent.name);
-      const detail = this.generateDetail(alert, agent.name);
+    for (let i = 0; i < AGENTS.length; i++) {
+      const cfg = AGENTS[i];
 
       const step: AgentStep = {
-        agentName: agent.name,
-        agentLabel: agent.label,
-        status: 'pending',
-        finding,
-        detail,
+        agentName: cfg.name,
+        agentLabel: cfg.label,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        finding: '⏳ Analysing…',
+        detail: '',
+        toolCalls: [],
       };
-
       alert.agentSteps.push(step);
+      onProgress({ ...step }, i);
 
-      await this.sleep(delay);
+      const t0 = Date.now();
 
-      step.status = 'running';
-      step.startedAt = new Date().toISOString();
+      /* ── Stream simulated tool calls ── */
+      const calls = this.buildToolCalls(cfg.name, alert);
+      for (const call of calls) {
+        await this.sleep(280 + Math.random() * 220);
+        step.toolCalls = [...(step.toolCalls ?? []), call];
+        step.finding = `🔍 Called ${call.tool}…`;
+        onProgress({ ...step }, i);
+      }
+
+      /* ── Wait for remaining agent "think" time ── */
+      const elapsed = Date.now() - t0;
+      const remaining = cfg.baseMs - elapsed + Math.random() * 400;
+      if (remaining > 0) await this.sleep(remaining);
 
       step.status = 'complete';
+      step.finding = this.generateFinding(alert, cfg.name);
+      step.detail = this.generateDetail(alert, cfg.name);
       step.completedAt = new Date().toISOString();
-      step.durationMs = delay;
+      step.durationMs = Date.now() - t0;
 
-      onProgress(step, i);
+      onProgress({ ...step }, i);
     }
 
     alert.status = 'triaged';
     alert.triageCompletedAt = new Date().toISOString();
 
-    const verdictResult = this.calculateVerdict(alert);
-    alert.verdict = verdictResult.verdict;
-    alert.confidence = verdictResult.confidence;
-
-    alert.responseActions = this.generateResponseActions(alert, verdictResult.verdict);
+    const { verdict, confidence } = this.calculateVerdict(alert);
+    alert.verdict = verdict;
+    alert.confidence = confidence;
+    alert.responseActions = this.generateResponseActions(alert, verdict);
 
     return alert;
   }
 
+  /* ── Build realistic tool calls per agent ─────────────────────── */
+
+  private buildToolCalls(agentName: string, alert: Alert): ToolCall[] {
+    const calls: ToolCall[] = [];
+    const now = new Date().toISOString();
+
+    const firstIP      = alert.iocs.find((i) => i.type === 'ip')?.value;
+    const firstDomain  = alert.iocs.find((i) => i.type === 'domain')?.value
+                      ?? alert.affectedAssets.find((a) => a.type === 'domain')?.value;
+    const firstHash    = alert.iocs.find((i) => i.type === 'hash')?.value;
+    const firstHost    = alert.affectedAssets.find((a) => a.type === 'host')?.value;
+    const firstUser    = alert.affectedAssets.find((a) => a.type === 'user')?.value;
+    const firstMitre   = alert.mitreTechniques?.[0]?.id;
+
+    const tool = (name: string, input: Record<string, string>): ToolCall => ({
+      tool: name,
+      input,
+      output: executeTool(name, input),
+      executedAt: now,
+    });
+
+    switch (agentName) {
+
+      case 'AlertIntakeAgent':
+        if (firstMitre) {
+          calls.push(tool('search_mitre_attack', { query: firstMitre }));
+        }
+        if (firstIP) {
+          calls.push(tool('lookup_ip_reputation', { ip: firstIP }));
+        }
+        break;
+
+      case 'EnrichmentAgent':
+        if (firstHost) {
+          calls.push(tool('get_asset_risk_profile', { asset_identifier: firstHost, asset_type: 'host' }));
+        }
+        if (firstUser) {
+          calls.push(tool('get_asset_risk_profile', { asset_identifier: firstUser, asset_type: 'user' }));
+        }
+        if (firstIP) {
+          calls.push(tool('lookup_ip_reputation', { ip: firstIP }));
+        }
+        if (firstDomain) {
+          calls.push(tool('lookup_domain_reputation', { domain: firstDomain }));
+        }
+        break;
+
+      case 'ThreatIntelAgent':
+        if (firstHash) {
+          calls.push(tool('lookup_file_hash', { hash: firstHash }));
+        }
+        if (firstMitre) {
+          calls.push(tool('search_mitre_attack', { query: firstMitre }));
+        }
+        if (firstIP) {
+          calls.push(tool('lookup_ip_reputation', { ip: firstIP }));
+        }
+        if (firstDomain) {
+          calls.push(tool('lookup_domain_reputation', { domain: firstDomain }));
+        }
+        break;
+
+      case 'CorrelationAgent':
+        if (firstHost) {
+          calls.push(tool('get_asset_risk_profile', { asset_identifier: firstHost, asset_type: 'host' }));
+        }
+        if (firstIP) {
+          calls.push(tool('lookup_ip_reputation', { ip: firstIP }));
+        }
+        break;
+
+      case 'InvestigationAgent':
+        if (firstIP) {
+          calls.push(tool('lookup_ip_reputation', { ip: firstIP }));
+        }
+        if (firstHash) {
+          calls.push(tool('lookup_file_hash', { hash: firstHash }));
+        }
+        if (firstDomain) {
+          calls.push(tool('lookup_domain_reputation', { domain: firstDomain }));
+        }
+        break;
+
+      /* VerdictAgent, ResponseAgent, ComplianceAgent use no tools */
+      default:
+        break;
+    }
+
+    return calls;
+  }
+
+  /* ── Findings text per agent ──────────────────────────────────── */
+
   private generateFinding(alert: Alert, agentName: string): string {
     const title = alert.title.toLowerCase();
+    const sev   = alert.severity.toUpperCase();
+    const host  = alert.affectedAssets.find((a) => a.type === 'host')?.value ?? 'UNKNOWN';
+    const maliciousIocs = alert.iocs.filter((i) => i.malicious).length;
 
     switch (agentName) {
       case 'AlertIntakeAgent':
-        if (title.includes('mimikatz')) {
-          return `Alert classified as CREDENTIAL_ACCESS event, severity ${alert.severity.toUpperCase()}. Source asset ${alert.affectedAssets[0]?.value || 'UNKNOWN'} is a domain controller. Process chain detected. Classification confidence: 98%.`;
-        } else if (title.includes('brute force')) {
-          return `Alert intake: Authentication attack vector detected. ${alert.affectedAssets.length} failed attempts aggregated. Source IP analysis queued. Severity: ${alert.severity}.`;
-        } else if (title.includes('impossible travel')) {
-          return `Anomalous user behavior detected: Geographic impossibility in login sequence. User ${alert.affectedAssets[0]?.value} flagged for review. Risk assessment: HIGH.`;
-        }
-        return `Alert parsed and classified as ${alert.severity.toUpperCase()} severity event. Initial threat assessment initiated.`;
+        if (title.includes('mimikatz'))
+          return `Alert classified as CREDENTIAL_ACCESS event (${sev}). Source asset ${host} is a domain controller. Process chain: system → lsass.exe → mimikatz.exe confirmed. Classification confidence: 98%.`;
+        if (title.includes('brute force'))
+          return `Authentication attack detected (${sev}). ${alert.affectedAssets.length} targeted accounts. Throttling pattern consistent with automated credential stuffing.`;
+        if (title.includes('impossible travel'))
+          return `Anomalous login behaviour: Geographic impossibility confirmed. User session crossed international boundaries in < 10 minutes — physically impossible. Risk: HIGH.`;
+        if (title.includes('ransomware'))
+          return `Mass file encryption event (${sev}). Alert intake complete — immediate escalation required. Encryption process active on ${host}.`;
+        if (title.includes('c2') || title.includes('beacon'))
+          return `C2 communication pattern identified (${sev}). Periodic beaconing interval suggests automated C2 framework. Infrastructure attribution in progress.`;
+        return `Alert parsed and classified: ${sev} severity ${alert.source} event. ${alert.affectedAssets.length} assets, ${alert.iocs.length} IOCs extracted. Triage initiated.`;
 
       case 'EnrichmentAgent':
-        return `Enrichment: ${alert.affectedAssets.length} assets identified. ${alert.iocs.length} IOCs correlated. Historical baseline comparison complete. Anomaly score: ${Math.floor(Math.random() * 100)}.`;
+        return `Enrichment complete. ${alert.affectedAssets.length} assets profiled. ${maliciousIocs > 0 ? `${maliciousIocs} IOCs confirmed malicious across threat feeds.` : 'No known malicious infrastructure.'} Asset risk scoring and historical baseline complete.`;
 
       case 'ThreatIntelAgent':
-        const maliciousIocs = alert.iocs.filter((i) => i.malicious).length;
-        if (maliciousIocs > 0) {
-          return `IOC enrichment complete. ${maliciousIocs} malicious indicators found. VirusTotal matches (${Math.floor(Math.random() * 80) + 10}/90 engines). Greynoise: confirmed attacker. MITRE correlation verified.`;
-        }
-        return `Threat intelligence: No known malicious infrastructure detected. Potential false positive indicator. Continued monitoring recommended.`;
+        if (maliciousIocs > 0)
+          return `Threat intelligence: ${maliciousIocs}/${alert.iocs.length} IOCs confirmed malicious. VirusTotal and AbuseIPDB cross-reference complete. MITRE ATT&CK technique attribution confirmed. Possible APT involvement.`;
+        return `Threat intelligence: IOC analysis complete. No strong attribution to known threat actors. Behavioural pattern analysis suggests opportunistic attacker. Monitoring recommended.`;
 
       case 'CorrelationAgent':
-        return `Correlation analysis: ${Math.floor(Math.random() * 5)} related alerts in past 24h. Attack pattern recognition: ${Math.random() > 0.5 ? 'APT28 TTPs detected' : 'Custom attack pattern'}. Correlation score: ${Math.floor(Math.random() * 40) + 60}%.`;
+        return `Correlation: ${Math.floor(Math.random() * 4) + 1} related alerts in the past 48h on the same asset cluster. Attack chain partially reconstructed. ${Math.random() > 0.5 ? 'APT28 TTPs consistent with observed behaviour.' : 'Pattern consistent with commodity malware campaign.'}`;
 
       case 'InvestigationAgent':
-        if (title.includes('mimikatz') || title.includes('credential')) {
-          return `Deep analysis: Credential access mechanism confirmed. Memory dump attempted. Privilege escalation chain identified. Full attacker chain reconstruction possible. Confidence: 97%.`;
-        } else if (title.includes('ransomware')) {
-          return `Investigation: File encryption pattern matches known ransomware. ${Math.floor(Math.random() * 5000) + 1000} files encrypted in 2-minute window. Variant identification: ${['REvil', 'Lockbit', 'BlackCat'][Math.floor(Math.random() * 3)]}.`;
-        }
-        return `Investigation: Behavioral analysis shows ${alert.severity === 'critical' ? 'confirmed malicious activity' : 'suspicious but inconclusive patterns'}. Further evidence collection needed.`;
+        if (title.includes('mimikatz') || title.includes('credential'))
+          return `Investigation confirmed: Credential access chain fully reconstructed. LSASS memory dump succeeded. Lateral movement via pass-the-hash likely next. Full attacker kill-chain documented.`;
+        if (title.includes('ransomware'))
+          return `Ransomware investigation: ${Math.floor(Math.random() * 5000) + 1000} files encrypted in < 3 minutes. Shadow copies targeted. Variant: ${['LockBit 3.0', 'BlackCat/ALPHV', 'Cl0p'][Math.floor(Math.random() * 3)]}. Exfiltration prior to encryption suspected.`;
+        return `Investigation: Behavioural analysis ${alert.severity === 'critical' ? 'confirms active threat — immediate response required.' : 'shows suspicious activity — further evidence collection needed.'}`;
 
       case 'VerdictAgent':
-        const isHighConfidence = alert.severity === 'critical' || title.includes('mimikatz');
-        if (isHighConfidence) {
-          return `VERDICT: TRUE POSITIVE (${Math.floor(Math.random() * 10) + 90}% confidence). Immediate containment required. SLA risk: HIGH if not contained within 15 minutes.`;
-        }
-        return `VERDICT: Assessment complete. ${Math.random() > 0.5 ? 'TRUE POSITIVE' : 'FALSE POSITIVE'} with ${Math.floor(Math.random() * 40) + 50}% confidence. Further investigation needed.`;
+        if (title.includes('mimikatz') || title.includes('ransomware') || title.includes('c2'))
+          return `VERDICT: TRUE_POSITIVE (${Math.floor(Math.random() * 8) + 90}% confidence). Active threat confirmed. Immediate containment required. SLA breach risk in < 15 minutes.`;
+        if (title.includes('brute force') || title.includes('lateral'))
+          return `VERDICT: TRUE_POSITIVE (${Math.floor(Math.random() * 20) + 70}% confidence). Genuine attack confirmed despite some noise. Response playbook triggered.`;
+        if (title.includes('impossible travel'))
+          return `VERDICT: ${Math.random() > 0.5 ? 'SUSPICIOUS (55% confidence). Possible account compromise — MFA reset recommended.' : 'FALSE_POSITIVE (68% confidence). VPN usage explains geographic anomaly.'}`;
+        return `VERDICT: SUSPICIOUS (${Math.floor(Math.random() * 30) + 50}% confidence). Inconclusive — additional investigation recommended.`;
 
       case 'ResponseAgent':
-        return `Response: ${Math.floor(Math.random() * 3) + 2} critical actions identified. Isolation recommended. Credential reset initiated. Logs collected for forensic analysis.`;
+        return `Response playbook generated. ${Math.floor(Math.random() * 3) + 3} priority actions queued. Network isolation, credential reset, and forensic collection recommended. Estimated containment time: 15–20 min.`;
 
       case 'ComplianceAgent':
-        return `Compliance: GDPR notification required. HIPAA logging verified. Audit trail complete. ${['PCI-DSS', 'SOC2', 'NIST'][Math.floor(Math.random() * 3)]} standards compliance confirmed.`;
+        return `Compliance assessment: GDPR Article 33 notification required within 72h. HIPAA Breach Rule applies if PHI involved. PCI-DSS incident log updated. Regulatory timeline initiated.`;
 
       default:
-        return 'Agent processing complete.';
+        return 'Analysis complete.';
     }
   }
 
   private generateDetail(alert: Alert, agentName: string): string {
     const assetCount = alert.affectedAssets.length;
-    const iocCount = alert.iocs.length;
+    const iocCount   = alert.iocs.length;
 
     switch (agentName) {
       case 'AlertIntakeAgent':
-        return `Raw event parsed. Field mapping: ${assetCount} assets, ${iocCount} IOCs detected. Severity override: none. Processing timestamp: ${new Date().toISOString()}`;
-
+        return `Raw event parsed. ${assetCount} assets, ${iocCount} IOCs mapped. No severity override applied. Ingestion latency: ${Math.floor(Math.random() * 200) + 50}ms.`;
       case 'EnrichmentAgent':
-        return `WHOIS lookup completed for ${alert.affectedAssets.filter((a) => a.type === 'ip').length} IPs. GeoIP data: US, Russia, China. OSINT correlation: 12 additional events found. Asset criticality scoring: 78%.`;
-
+        return `GeoIP resolved for ${alert.affectedAssets.filter((a) => a.type === 'ip').length} IPs. OSINT correlation: ${Math.floor(Math.random() * 15) + 5} external references. Asset criticality: ${Math.floor(Math.random() * 30) + 70}%.`;
       case 'ThreatIntelAgent':
-        return `${iocCount} IOCs checked against 47 threat feeds. Feed status: 45 operational, 2 degraded. Last update: 2 minutes ago. Hash matching: ${Math.floor(Math.random() * 80) + 10}% database coverage.`;
-
+        return `${iocCount} IOCs checked across 47 threat feeds. Feed freshness: 98% updated within 1h. Confidence-weighted scoring applied. Hash coverage: ${Math.floor(Math.random() * 15) + 82}%.`;
       case 'CorrelationAgent':
-        return `Cross-correlation complete. Timeframe: 72 hours. Similar event clusters: ${Math.floor(Math.random() * 3) + 1}. Correlation strength: ${Math.floor(Math.random() * 40) + 60}%. Campaign assessment: Possible coordinated activity.`;
-
+        return `72-hour lookback window. ${Math.floor(Math.random() * 3) + 1} overlapping alert clusters identified. Correlation method: IOC intersection + temporal proximity + asset overlap.`;
       case 'InvestigationAgent':
-        return `Behavioral timeline: Event occurred at ${new Date(alert.timestamp).toLocaleTimeString()}. Parent process: system. Network connections: 3 external IPs. File system activity: ${Math.floor(Math.random() * 50000) + 10000} files accessed. Execution context: LocalSystem.`;
-
+        return `Event timeline: T+0s alert fired. T+${Math.floor(Math.random() * 30) + 5}s lateral movement. T+${Math.floor(Math.random() * 120) + 60}s C2 check-in. Parent process tree extracted. ${Math.floor(Math.random() * 30000) + 10000} file ops analysed.`;
       case 'VerdictAgent':
-        return `Evidence aggregation: ${Math.floor(Math.random() * 50) + 50} supporting indicators. Counter-indicators: ${Math.floor(Math.random() * 20)}. ML model score: ${(Math.random() * 0.5 + 0.5).toFixed(3)}. Final determination: Legitimate threat detected.`;
-
+        return `Decision factors: ${Math.floor(Math.random() * 40) + 40} supporting indicators, ${Math.floor(Math.random() * 10)} counter-indicators. ML ensemble score: ${(Math.random() * 0.3 + 0.7).toFixed(3)}. Human review override: none.`;
       case 'ResponseAgent':
-        return `Recommended actions: (1) Isolate ${alert.affectedAssets[0]?.value || 'host'} from network. (2) Reset credentials for affected users. (3) Deploy EDR sensors. (4) Create SNOW ticket. Estimated containment time: 15 minutes.`;
-
+        return `Recommended: (1) Isolate ${alert.affectedAssets[0]?.value ?? 'affected host'}. (2) Reset credentials. (3) Deploy EDR containment policy. (4) Collect memory dump + network flows. (5) Raise SNOW P1 ticket.`;
       case 'ComplianceAgent':
-        return `Regulatory checklist: Incident notification required per state law (NY, CA). Data exposure assessment: No PII confirmed. Mandatory reporting timeline: 72 hours. Stakeholders notified: Legal, Compliance, Board.`;
-
+        return `Regulatory checklist: GDPR ✓ HIPAA ✓ PCI-DSS ✓ SOC 2 ✓. Data exposure: under assessment. Board notification: pending CISO sign-off. Evidence preservation: active.`;
       default:
-        return 'Processing complete.';
+        return '';
     }
   }
 
+  /* ── Verdict logic ────────────────────────────────────────────── */
+
   private calculateVerdict(alert: Alert): { verdict: Verdict; confidence: number } {
-    const title = alert.title.toLowerCase();
-    
+    const t = alert.title.toLowerCase();
+    let base = 50;
+    let verdict: Verdict = 'suspicious';
 
-    let baseConfidence = 50;
-    let verdict: Verdict = 'pending';
+    if (t.includes('mimikatz') || t.includes('credential dumping')) { base = 95; verdict = 'true_positive'; }
+    else if (t.includes('ransomware'))                               { base = 95; verdict = 'true_positive'; }
+    else if (t.includes('c2 beacon') || t.includes('cryptomining')) { base = 88; verdict = 'true_positive'; }
+    else if (t.includes('lateral movement') || t.includes('wmi'))   { base = 72; verdict = 'true_positive'; }
+    else if (t.includes('brute force'))                              { base = 68; verdict = 'true_positive'; }
+    else if (t.includes('impossible travel'))                        { base = Math.random() > 0.5 ? 58 : 32; verdict = base > 50 ? 'suspicious' : 'false_positive'; }
+    else if (t.includes('spearphishing'))                            { base = 62; verdict = 'suspicious'; }
+    else if (t.includes('privileged'))                               { base = Math.random() > 0.6 ? 48 : 28; verdict = base > 42 ? 'suspicious' : 'false_positive'; }
+    else if (t.includes('mfa bypass'))                               { base = 80; verdict = 'true_positive'; }
 
-    if (title.includes('mimikatz') || title.includes('credential dumping') || title.includes('ransomware')) {
-      baseConfidence = 95;
-      verdict = 'true_positive';
-    } else if (title.includes('brute force')) {
-      baseConfidence = Math.random() > 0.35 ? 75 : 45;
-      verdict = baseConfidence > 70 ? 'true_positive' : 'suspicious';
-    } else if (title.includes('impossible travel')) {
-      baseConfidence = Math.random() > 0.55 ? 65 : 35;
-      verdict = baseConfidence > 60 ? 'true_positive' : 'false_positive';
-    } else if (title.includes('cryptomining')) {
-      baseConfidence = 82;
-      verdict = 'true_positive';
-    } else if (title.includes('lateral movement') || title.includes('wmi')) {
-      baseConfidence = 70;
-      verdict = 'true_positive';
-    } else if (title.includes('spearphishing')) {
-      baseConfidence = 60;
-      verdict = 'suspicious';
-    } else if (title.includes('privileged')) {
-      baseConfidence = Math.random() > 0.65 ? 50 : 30;
-      verdict = baseConfidence > 45 ? 'suspicious' : 'false_positive';
-    } else if (title.includes('c2 beacon')) {
-      baseConfidence = 88;
-      verdict = 'true_positive';
-    } else {
-      verdict = 'pending';
-      baseConfidence = 50;
-    }
-
-    const variation = (Math.random() - 0.5) * 10;
-    const confidence = Math.min(99, Math.max(20, baseConfidence + variation));
-
+    const confidence = Math.min(99, Math.max(20, base + (Math.random() - 0.5) * 10));
     return { verdict, confidence };
   }
 
+  /* ── Response actions ─────────────────────────────────────────── */
+
   private generateResponseActions(alert: Alert, verdict: Verdict): ResponseAction[] {
+    if (verdict !== 'true_positive' && verdict !== 'suspicious') return [];
+
     const actions: ResponseAction[] = [];
+    const host = alert.affectedAssets.find((a) => a.type === 'host');
+    const user = alert.affectedAssets.find((a) => a.type === 'user');
+    const ip   = alert.affectedAssets.find((a) => a.type === 'ip');
 
     if (verdict === 'true_positive') {
-      const targetHost = alert.affectedAssets.find((a) => a.type === 'host');
-      if (targetHost) {
-        actions.push({
-          id: 'action-1',
-          type: 'isolate_host',
-          label: `Isolate ${targetHost.value}`,
-          description: `Remove host from network and disable all connectivity`,
-          priority: 'immediate',
-          status: 'pending',
-        });
-      }
-
-      const targetUser = alert.affectedAssets.find((a) => a.type === 'user');
-      if (targetUser) {
-        actions.push({
-          id: 'action-2',
-          type: 'reset_password',
-          label: `Reset password for ${targetUser.value}`,
-          description: `Force password reset and revoke active sessions`,
-          priority: 'urgent',
-          status: 'pending',
-        });
-      }
-
-      const targetIp = alert.affectedAssets.find((a) => a.type === 'ip');
-      if (targetIp) {
-        actions.push({
-          id: 'action-3',
-          type: 'block_ip',
-          label: `Block IP ${targetIp.value}`,
-          description: `Add to firewall blocklist across all segments`,
-          priority: 'urgent',
-          status: 'pending',
-        });
-      }
-
-      actions.push({
-        id: 'action-4',
-        type: 'collect_logs',
-        label: 'Collect forensic logs',
-        description: `Gather endpoint logs, network flows, and event logs for analysis`,
-        priority: 'urgent',
-        status: 'pending',
-      });
-
-      actions.push({
-        id: 'action-5',
-        type: 'create_ticket',
-        label: 'Create incident ticket',
-        description: `SNOW ticket for escalation and tracking`,
-        priority: 'urgent',
-        status: 'pending',
-      });
-
-      actions.push({
-        id: 'action-6',
-        type: 'notify',
-        label: 'Notify security team',
-        description: `Alert CISO and SOC leadership`,
-        priority: 'immediate',
-        status: 'pending',
-      });
-    } else if (verdict === 'suspicious') {
-      actions.push({
-        id: 'action-1',
-        type: 'collect_logs',
-        label: 'Collect additional evidence',
-        description: `Gather more context for investigation`,
-        priority: 'normal',
-        status: 'pending',
-      });
-
-      actions.push({
-        id: 'action-2',
-        type: 'create_ticket',
-        label: 'Create investigation ticket',
-        description: `Queue for analyst review`,
-        priority: 'normal',
-        status: 'pending',
-      });
+      if (host)  actions.push({ id: 'a1', type: 'isolate_host',  label: `Isolate ${host.value}`,           description: 'Remove from network and disable all connectivity',           priority: 'immediate', status: 'pending' });
+      if (user)  actions.push({ id: 'a2', type: 'reset_password', label: `Reset credentials for ${user.value}`, description: 'Force reset + revoke all active sessions',         priority: 'urgent',    status: 'pending' });
+      if (ip)    actions.push({ id: 'a3', type: 'block_ip',       label: `Block ${ip.value}`,               description: 'Add to firewall blocklist across all network segments', priority: 'urgent',    status: 'pending' });
+                 actions.push({ id: 'a4', type: 'collect_logs',   label: 'Collect forensic evidence',       description: 'Memory dump, network flows, EDR telemetry',             priority: 'urgent',    status: 'pending' });
+                 actions.push({ id: 'a5', type: 'create_ticket',  label: 'Raise P1 incident ticket',        description: 'Create SNOW ticket for escalation and tracking',        priority: 'urgent',    status: 'pending' });
+                 actions.push({ id: 'a6', type: 'notify',         label: 'Notify CISO + SOC lead',          description: 'Immediate notification per incident response plan',     priority: 'immediate', status: 'pending' });
+    } else {
+      actions.push({ id: 'a1', type: 'collect_logs',  label: 'Collect additional evidence', description: 'Gather more context for investigation', priority: 'normal', status: 'pending' });
+      actions.push({ id: 'a2', type: 'create_ticket', label: 'Create investigation ticket', description: 'Queue for analyst review',               priority: 'normal', status: 'pending' });
     }
 
     return actions;
   }
 
-  private randomDelay(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
-
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((r) => setTimeout(r, ms));
   }
 }
