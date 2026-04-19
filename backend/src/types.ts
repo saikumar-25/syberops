@@ -25,6 +25,13 @@ export interface Alert {
   incidentId?: string;
 }
 
+export interface ToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  executedAt: string;
+}
+
 export interface AgentStep {
   agentName: string;
   agentLabel: string;
@@ -34,6 +41,7 @@ export interface AgentStep {
   durationMs?: number;
   finding: string;
   detail?: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface Asset {

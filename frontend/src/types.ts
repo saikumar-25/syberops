@@ -25,6 +25,14 @@ export interface Alert {
   rawPayload?: Record<string, unknown>;
 }
 
+/* Tool call made by an agent during its agentic loop */
+export interface ToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+  executedAt: string;
+}
+
 /* AI Agent step in triaging process */
 export interface AgentStep {
   agentName: string;
@@ -35,6 +43,7 @@ export interface AgentStep {
   durationMs?: number;
   finding?: string;
   detail?: string;
+  toolCalls?: ToolCall[];
 }
 
 /* Metrics — field names match the backend /api/metrics response */

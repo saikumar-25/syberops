@@ -155,6 +155,139 @@
   font-weight: 500;
 }
 
+.step-tool-count {
+  font-size: 10px;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.step-running {
+  font-size: 10px;
+  color: var(--accent-purple);
+  font-weight: 600;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Tool call cards ─────────────────────────────────────────── */
+
+.tool-calls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: var(--spacing-sm) 0;
+}
+
+.tool-call-card {
+  background: rgba(6, 182, 212, 0.04);
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-radius: 4px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tool-call-card:hover {
+  background: rgba(6, 182, 212, 0.09);
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tool-call-icon {
+  font-size: 12px;
+}
+
+.tool-call-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.tool-call-input {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Monaco', 'Menlo', monospace;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.tool-badge-bad {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.tool-badge-good {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.tool-badge-neutral {
+  background: rgba(156, 163, 175, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.tool-expand {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.tool-output-grid {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(6, 182, 212, 0.1);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+}
+
+.tool-output-row {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+  font-size: 10px;
+}
+
+.tool-output-key {
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tool-output-val {
+  color: var(--text-secondary);
+  font-family: 'Monaco', 'Menlo', monospace;
+  word-break: break-all;
+}
+
+.tool-output-val.val-bad  { color: #ef4444; font-weight: 600; }
+.tool-output-val.val-good { color: #10b981; font-weight: 600; }
+
+/* ── Finding output ──────────────────────────────────────────── */
+
 .step-output {
   background: var(--bg-secondary);
   padding: var(--spacing-sm);
